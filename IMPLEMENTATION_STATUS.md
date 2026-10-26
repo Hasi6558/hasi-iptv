@@ -64,7 +64,7 @@ Legend: ✅ done and verified on desktop · ⏳ pending (needs TV or an action f
 
 ## Phase 5 — Performance, reliability and release
 
-- ✅ Automated checks: `npm run check` (type-check, 68 unit tests, build, 4 E2E tests) passes.
+- ✅ Automated checks: `npm run check` (type-check, 70 unit tests, build, 4 E2E tests) passes.
 - ✅ Leak checks (unit): 20 rapid switches leave exactly one hls.js instance for the latest channel; stop/destroy remove the engine, `src` and every listener.
 - ✅ Failure cases covered by tests: 404/HTTP errors, network/CORS-like errors, mixed content, codec errors (one `recoverMediaError` then fail), autoplay refusal, stalls, missing channels, failed refresh (existing data kept), corrupt storage records, failed transactions roll back, invalid/unsafe backups, missing logos (fallback initials, no retry loop).
 - ⏳ One hour of continuous viewing and repeated switching **on the TV**.
@@ -104,6 +104,7 @@ Machine: Windows 11 development PC, Node 22, Chrome (installed) / Playwright Chr
 
 - ⚠️ 2,290 of the 11,331 iptv-org entries use `http://`. From the HTTPS Vercel site, browsers block or auto-upgrade them, so many will fail. Workaround: `npm run serve:lan` and open `http://<PC-IP>:4173` on the TV (separate local data).
 - ⚠️ 726 iptv-org entries ask for custom User-Agent/Referer headers, which browsers cannot send (9 more use non-HTTP schemes and are skipped). They are imported with a *Needs headers* badge and may fail.
+- ✅ Fixed after first Vercel test: an `http://` channel that Chrome auto-upgraded and then failed with `DEMUXER_ERROR_COULD_NOT_PARSE` was wrongly shown as "HTTP stream blocked" and skipped the hls.js fallback. It now tries the other engine and reports "Stream format not supported by this player".
 - ⚠️ CORS failures cannot be told apart from geo-blocks or offline servers in a browser; the message says so.
 - ⚠️ Local data is per browser and per exact origin; nothing syncs between devices.
 - ⚠️ TV browsers may not support file upload/download; backups are mainly for desktop.

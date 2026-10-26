@@ -84,6 +84,8 @@ export class PlaybackController {
   private engines: EngineName[] = [];
   private engineIdx = 0;
   private mediaRecovered = false;
+  /** A parse/format error seen earlier in this request (data arrived but was unreadable). */
+  private formatError: PlaybackError | undefined;
   private userPaused = false;
   private startTimer: ReturnType<typeof setTimeout> | undefined;
   private stallTimer: ReturnType<typeof setTimeout> | undefined;
@@ -143,6 +145,7 @@ export class PlaybackController {
     this.clearTimers();
     this.teardown();
     this.userPaused = false;
+    this.formatError = undefined;
     const notes: string[] = [];
     if (isMixedContent(channel.streamUrl, this.deps.pageProtocol())) {
       notes.push('Uses http:// on an https:// page — the browser may block it.');
@@ -322,18 +325,25 @@ export class PlaybackController {
     if (!this.isCurrent(id)) return;
     this.clearTimers();
     let err = error;
-    const channel = this.state.channel;
-    if (channel && isMixedContent(channel.streamUrl, this.deps.pageProtocol()) && ['network', 'unsupported', 'unknown', 'timeout'].includes(err.diagnosis)) {
-      err = mixedContentError(err.technical);
-    }
     if (!this.deps.isOnline()) err = { ...offlineError(), technical: err.technical };
+    // Remember that an engine actually received (but could not parse) the stream.
+    if (err.dataReceived) this.formatError = err;
 
-    const canFallback = this.engineIdx + 1 < this.engines.length && !this.hadPlayback && !['provider-http', 'offline', 'mixed-content'].includes(err.diagnosis);
+    // Try the other engine first, judged on the engine's own diagnosis.
+    const canFallback = this.engineIdx + 1 < this.engines.length && !this.hadPlayback && !['provider-http', 'offline'].includes(err.diagnosis);
     if (canFallback) {
       this.teardown();
       this.set({ message: `Trying ${this.engines[this.engineIdx + 1]} player…` });
       void this.start(id, this.engineIdx + 1);
       return;
+    }
+
+    // Only blame mixed content when nothing was received at all.
+    const channel = this.state.channel;
+    if (channel && isMixedContent(channel.streamUrl, this.deps.pageProtocol()) && ['network', 'unknown', 'timeout'].includes(err.diagnosis)) {
+      err = this.formatError
+        ? { ...this.formatError, detail: `${this.formatError.detail} The hls.js player could not try it because the address is http:// on an https:// page.` }
+        : mixedContentError(err.technical);
     }
     const attempt = this.state.attempt;
     if (err.retryable && err.diagnosis !== 'offline' && attempt < MAX_RETRIES) {

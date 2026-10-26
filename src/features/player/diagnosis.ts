@@ -17,6 +17,8 @@ export type PlaybackError = {
   /** Whether an automatic retry is worthwhile. */
   retryable: boolean;
   httpStatus?: number;
+  /** The stream was downloaded but could not be parsed/decoded, so it was not blocked. */
+  dataReceived?: boolean;
   /** Raw engine detail for diagnostics (never contains the URL). */
   technical?: string;
 };
@@ -107,6 +109,18 @@ export function fromMediaError(err: MediaError | null, online: boolean): Playbac
   const code = err?.code ?? 0;
   const technical = `MediaError ${code}${err?.message ? `: ${err.message}` : ''}`;
   if (!online) return { ...offlineError(), technical };
+  // Chromium reports demuxer failures in the message: bytes arrived but the format was unreadable.
+  if (/DEMUXER_ERROR|COULD_NOT_PARSE|NO_SUPPORTED_STREAMS/i.test(err?.message ?? '')) {
+    return {
+      diagnosis: 'unsupported',
+      title: 'Stream format not supported by this player',
+      detail: 'The stream was reached, but this browser could not read its format. Try the other player engine in Settings, or another stream of this channel.',
+      certain: true,
+      retryable: false,
+      dataReceived: true,
+      technical,
+    };
+  }
   switch (code) {
     case 2:
       return { diagnosis: 'network', title: 'Network error while loading', detail: 'The stream could not be downloaded. The server may be down or blocking this device.', certain: false, retryable: true, technical };

@@ -234,6 +234,23 @@ describe('PlaybackController lifecycle', () => {
     expect(c.getState()).toMatchObject({ status: 'error', error: { diagnosis: 'mixed-content', certain: false } });
   });
 
+  it('a native demuxer error on an http stream tries hls.js and is not blamed on mixed content', async () => {
+    const { c, video } = setup({ nativeHls: true });
+    c.play(ch('a', 'http://insecure.example/a.m3u8'));
+    expect(c.getState().engine).toBe('native');
+    video.error = { code: 4, message: 'PipelineStatus::DEMUXER_ERROR_COULD_NOT_PARSE' };
+    video.fire('error');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(c.getState().engine).toBe('hls.js'); // fallback was attempted
+    // hls.js fetch of http:// from https:// is blocked: a status-0 network error.
+    FakeHls.instances[0].emit('hlsError', { fatal: true, type: 'networkError', details: 'manifestLoadError', response: { code: 0 } });
+    const err = c.getState().error!;
+    expect(c.getState().status).toBe('error');
+    expect(err.diagnosis).toBe('unsupported');
+    expect(err.title).toBe('Stream format not supported by this player');
+    expect(err.detail).toMatch(/hls\.js player could not try it/);
+  });
+
   it('stop releases the engine and the decoder', async () => {
     const { c, video } = setup();
     c.play(ch('a'));
@@ -279,6 +296,10 @@ describe('diagnosis mapping', () => {
   it('maps offline state regardless of error type', () => {
     expect(fromHlsError({ type: 'networkError' }, false).diagnosis).toBe('offline');
     expect(fromMediaError({ code: 2 } as MediaError, false).diagnosis).toBe('offline');
+  });
+  it('treats Chromium demuxer errors as a certain format problem with data received', () => {
+    const e = fromMediaError({ code: 4, message: 'PipelineStatus::DEMUXER_ERROR_COULD_NOT_PARSE' } as MediaError, true);
+    expect(e).toMatchObject({ diagnosis: 'unsupported', certain: true, dataReceived: true, retryable: false });
   });
   it('marks native "not supported" as uncertain', () => {
     expect(fromMediaError({ code: 4 } as MediaError, true)).toMatchObject({ diagnosis: 'unsupported', certain: false });
