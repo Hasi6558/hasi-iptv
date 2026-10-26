@@ -1,0 +1,12 @@
+#EXTM3U
+# Synthetic sample playlist for tests and E2E. No real providers.
+#EXTINF:-1 tvg-id="alpha.xx" tvg-logo="https://logos.example.invalid/alpha.png" group-title="News",Alpha News
+/media/test.webm
+#EXTINF:-1 tvg-id="beta.xx" group-title="Sports",Beta Sports, Live
+/media/test.webm
+#EXTINF:-1 tvg-id="gamma.xx" group-title="Movies;Kids",Gamma Movies (720p)
+/media/test.webm
+#EXTINF:-1 tvg-id="delta.xx" group-title="News",Delta Broken
+/media/does-not-exist.m3u8
+#EXTINF:-1 tvg-id="epsilon.xx" group-title="Music",Epsilon Music
+/media/test.webm
